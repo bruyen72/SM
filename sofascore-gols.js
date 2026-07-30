@@ -208,6 +208,11 @@ function gerarHtml(resultados, data, minCombinado) {
     })
     .join("\n");
 
+  const listaOuVazio =
+    resultados.length > 0
+      ? linhas
+      : `<div class="vazio">😕 Nenhum jogo com chance forte de gol encontrado agora.<br>Isso é normal em dias com poucos jogos grandes. Tente mais tarde ou outra data.</div>`;
+
   return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -236,13 +241,14 @@ function gerarHtml(resultados, data, minCombinado) {
   .faixa-vivo { background:#fdecea; color:#c0392b; animation: pisca 1.4s infinite; }
   .faixa-encerrado { background:#eee; color:#555; }
   @keyframes pisca { 0%, 100% { opacity:1; } 50% { opacity:0.55; } }
+  .vazio { background:#fff; border-radius:12px; padding:32px 20px; text-align:center; color:#555; font-size:15px; box-shadow:0 2px 6px rgba(0,0,0,0.08); }
 </style>
 </head>
 <body>
   <h1>⚽ Jogos com chance de mais de 2,5 gols</h1>
   <div class="subtitulo">Data: ${escapeHtml(data)} • Mínimo analisado: ${minCombinado} gols combinados • ${resultados.length} jogo(s) encontrado(s)</div>
   <div class="lista">
-    ${linhas}
+    ${listaOuVazio}
   </div>
   <div class="aviso">
     ⚠️ Isso é estatística baseada nos últimos jogos de cada time. Não é garantia de resultado. Aposte com responsabilidade.
@@ -286,10 +292,9 @@ async function main() {
 
   if (jogos.length === 0) {
     console.log("Nenhum jogo encontrado para essa data.");
-    return;
+  } else {
+    console.log(`${jogos.length} jogos encontrados. Analisando ataque dos times (isso demora um pouco)...\n`);
   }
-
-  console.log(`${jogos.length} jogos encontrados. Analisando ataque dos times (isso demora um pouco)...\n`);
 
   const resultados = [];
 
@@ -346,35 +351,35 @@ async function main() {
 
   if (resultados.length === 0) {
     console.log(`Nenhum jogo com média combinada >= ${minCombinado} gols encontrado hoje.`);
-    return;
-  }
-
-  console.log(`\n=== JOGOS COM CHANCE DE MAIS DE 2,5 GOLS (${data}) ===\n`);
-  console.log(
-    "Hora  | Campeonato".padEnd(28) +
-      "| Confronto".padEnd(38) +
-      "| Média Mand. | Média Vis. | Combinado | Sinal".padEnd(20) +
-      "| Status"
-  );
-  console.log("-".repeat(135));
-
-  for (const r of resultados) {
-    const confronto = `${r.mandanteNome} x ${r.visitanteNome}`;
-    const statusStr =
-      r.statusTipo === "inprogress"
-        ? `AO VIVO ${r.golsAoVivoMandante ?? "-"}x${r.golsAoVivoVisitante ?? "-"} (${r.statusTexto})`
-        : r.statusTipo === "finished"
-        ? `Encerrado ${r.golsAoVivoMandante ?? "-"}x${r.golsAoVivoVisitante ?? "-"}`
-        : "Ainda nao comecou";
+    console.log("(mesmo assim, os arquivos vao ser salvos/atualizados, so que vazios)\n");
+  } else {
+    console.log(`\n=== JOGOS COM CHANCE DE MAIS DE 2,5 GOLS (${data}) ===\n`);
     console.log(
-      `${r.hora}  | ${r.campeonato}`.padEnd(28).slice(0, 28) +
-        `| ${confronto}`.padEnd(38).slice(0, 38) +
-        `| ${r.mediaMandante.toFixed(2)}`.padEnd(14) +
-        `| ${r.mediaVisitante.toFixed(2)}`.padEnd(13) +
-        `| ${r.combinado.toFixed(2)}`.padEnd(11) +
-        `| ${r.selo}`.padEnd(20) +
-        `| ${statusStr}`
+      "Hora  | Campeonato".padEnd(28) +
+        "| Confronto".padEnd(38) +
+        "| Média Mand. | Média Vis. | Combinado | Sinal".padEnd(20) +
+        "| Status"
     );
+    console.log("-".repeat(135));
+
+    for (const r of resultados) {
+      const confronto = `${r.mandanteNome} x ${r.visitanteNome}`;
+      const statusStr =
+        r.statusTipo === "inprogress"
+          ? `AO VIVO ${r.golsAoVivoMandante ?? "-"}x${r.golsAoVivoVisitante ?? "-"} (${r.statusTexto})`
+          : r.statusTipo === "finished"
+          ? `Encerrado ${r.golsAoVivoMandante ?? "-"}x${r.golsAoVivoVisitante ?? "-"}`
+          : "Ainda nao comecou";
+      console.log(
+        `${r.hora}  | ${r.campeonato}`.padEnd(28).slice(0, 28) +
+          `| ${confronto}`.padEnd(38).slice(0, 38) +
+          `| ${r.mediaMandante.toFixed(2)}`.padEnd(14) +
+          `| ${r.mediaVisitante.toFixed(2)}`.padEnd(13) +
+          `| ${r.combinado.toFixed(2)}`.padEnd(11) +
+          `| ${r.selo}`.padEnd(20) +
+          `| ${statusStr}`
+      );
+    }
   }
 
   // salva também em CSV
