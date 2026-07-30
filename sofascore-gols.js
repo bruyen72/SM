@@ -68,6 +68,30 @@ function horaLocal(timestampSeg) {
   return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 }
 
+// traduz o status do jogo (que a Sofascore manda em ingles) pro portugues
+const STATUS_PT = {
+  "Not started": "Ainda não começou",
+  "1st half": "1º tempo",
+  "Halftime": "Intervalo",
+  "2nd half": "2º tempo",
+  "Extra time": "Prorrogação",
+  "1st half extra time": "1º tempo (prorrogação)",
+  "2nd half extra time": "2º tempo (prorrogação)",
+  "Penalties": "Pênaltis",
+  "Ended": "Encerrado",
+  "Finished": "Encerrado",
+  "Postponed": "Adiado",
+  "Cancelled": "Cancelado",
+  "Interrupted": "Interrompido",
+  "Abandoned": "Abandonado",
+  "Walkover": "W.O.",
+};
+
+function statusEmPortugues(jogo) {
+  const desc = jogo.status?.description || "";
+  return STATUS_PT[desc] || desc || "-";
+}
+
 // ---------- Sofascore calls ----------
 
 async function getJogosDoDia(data) {
@@ -134,8 +158,25 @@ function gerarHtml(resultados, data, minCombinado) {
       const s = infoSelo(r.selo);
       const logoMandante = `${BASE}/team/${r.mandanteId}/image`;
       const logoVisitante = `${BASE}/team/${r.visitanteId}/image`;
+
+      const aoVivo = r.statusTipo === "inprogress";
+      const encerrado = r.statusTipo === "finished";
+      const temPlacar = r.golsAoVivoMandante != null && r.golsAoVivoVisitante != null;
+
+      let faixaStatus = "";
+      if (aoVivo) {
+        faixaStatus = `<div class="faixa faixa-vivo">🔴 AO VIVO — ${escapeHtml(r.statusTexto)}${
+          temPlacar ? ` — placar: <b>${r.golsAoVivoMandante} x ${r.golsAoVivoVisitante}</b>` : ""
+        }</div>`;
+      } else if (encerrado) {
+        faixaStatus = `<div class="faixa faixa-encerrado">⚫ ENCERRADO${
+          temPlacar ? ` — placar final: <b>${r.golsAoVivoMandante} x ${r.golsAoVivoVisitante}</b>` : ""
+        }</div>`;
+      }
+
       return `
       <div class="jogo">
+        ${faixaStatus}
         <div class="topo">
           <span class="hora">🕒 ${escapeHtml(r.hora)}</span>
           <span class="campeonato">${escapeHtml(r.campeonato)}</span>
@@ -191,6 +232,10 @@ function gerarHtml(resultados, data, minCombinado) {
   .combinado { font-size:15px; }
   .selo { padding:6px 12px; border-radius:20px; font-weight:bold; font-size:14px; white-space:nowrap; }
   .aviso { max-width:720px; margin:24px auto 0; background:#fff3cd; border:1px solid #ffe08a; color:#7a5c00; padding:12px 16px; border-radius:8px; font-size:14px; }
+  .faixa { text-align:center; font-weight:bold; font-size:13px; padding:6px 10px; border-radius:8px; margin-bottom:12px; }
+  .faixa-vivo { background:#fdecea; color:#c0392b; animation: pisca 1.4s infinite; }
+  .faixa-encerrado { background:#eee; color:#555; }
+  @keyframes pisca { 0%, 100% { opacity:1; } 50% { opacity:0.55; } }
 </style>
 </head>
 <body>
@@ -290,6 +335,10 @@ async function main() {
       mediaVisitante: visitante.media,
       combinado,
       selo,
+      statusTipo: jogo.status?.type || "notstarted", // notstarted | inprogress | finished
+      statusTexto: statusEmPortugues(jogo),
+      golsAoVivoMandante: jogo.homeScore?.current,
+      golsAoVivoVisitante: jogo.awayScore?.current,
     });
   }
 
@@ -304,19 +353,27 @@ async function main() {
   console.log(
     "Hora  | Campeonato".padEnd(28) +
       "| Confronto".padEnd(38) +
-      "| Média Mand. | Média Vis. | Combinado | Sinal"
+      "| Média Mand. | Média Vis. | Combinado | Sinal".padEnd(20) +
+      "| Status"
   );
-  console.log("-".repeat(115));
+  console.log("-".repeat(135));
 
   for (const r of resultados) {
     const confronto = `${r.mandanteNome} x ${r.visitanteNome}`;
+    const statusStr =
+      r.statusTipo === "inprogress"
+        ? `AO VIVO ${r.golsAoVivoMandante ?? "-"}x${r.golsAoVivoVisitante ?? "-"} (${r.statusTexto})`
+        : r.statusTipo === "finished"
+        ? `Encerrado ${r.golsAoVivoMandante ?? "-"}x${r.golsAoVivoVisitante ?? "-"}`
+        : "Ainda nao comecou";
     console.log(
       `${r.hora}  | ${r.campeonato}`.padEnd(28).slice(0, 28) +
         `| ${confronto}`.padEnd(38).slice(0, 38) +
         `| ${r.mediaMandante.toFixed(2)}`.padEnd(14) +
         `| ${r.mediaVisitante.toFixed(2)}`.padEnd(13) +
         `| ${r.combinado.toFixed(2)}`.padEnd(11) +
-        `| ${r.selo}`
+        `| ${r.selo}`.padEnd(20) +
+        `| ${statusStr}`
     );
   }
 
