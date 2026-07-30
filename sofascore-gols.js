@@ -146,113 +146,221 @@ function escapeHtml(texto) {
 }
 
 function infoSelo(selo) {
-  // cor + icone + texto juntos (nunca só cor, nunca só texto)
-  if (selo === "MUITO FORTE") return { cor: "#c0392b", fundo: "#fdecea", icone: "🔥🔥🔥", texto: "MUITO FORTE" };
-  if (selo === "FORTE") return { cor: "#d35400", fundo: "#fdf1e3", icone: "🔥🔥", texto: "FORTE" };
-  return { cor: "#b7950b", fundo: "#fef9e7", icone: "🔥", texto: "PROVÁVEL" };
+  if (selo === "MUITO FORTE") return { cor: "#ff5c5c", texto: "MUITO FORTE", nivel: 3 };
+  if (selo === "FORTE") return { cor: "#ff9d42", texto: "FORTE", nivel: 2 };
+  return { cor: "#ffd166", texto: "PROVÁVEL", nivel: 1 };
 }
 
-function gerarHtml(resultados, data, minCombinado) {
-  const linhas = resultados
-    .map((r) => {
-      const s = infoSelo(r.selo);
-      const logoMandante = `${BASE}/team/${r.mandanteId}/image`;
-      const logoVisitante = `${BASE}/team/${r.visitanteId}/image`;
+function cartaoJogo(r) {
+  const s = infoSelo(r.selo);
+  const logoMandante = `${BASE}/team/${r.mandanteId}/image`;
+  const logoVisitante = `${BASE}/team/${r.visitanteId}/image`;
 
-      const aoVivo = r.statusTipo === "inprogress";
-      const encerrado = r.statusTipo === "finished";
-      const temPlacar = r.golsAoVivoMandante != null && r.golsAoVivoVisitante != null;
+  const aoVivo = r.statusTipo === "inprogress";
+  const encerrado = r.statusTipo === "finished";
+  const temPlacar = r.golsAoVivoMandante != null && r.golsAoVivoVisitante != null;
 
-      let faixaStatus = "";
-      if (aoVivo) {
-        faixaStatus = `<div class="faixa faixa-vivo">🔴 AO VIVO — ${escapeHtml(r.statusTexto)}${
-          temPlacar ? ` — placar: <b>${r.golsAoVivoMandante} x ${r.golsAoVivoVisitante}</b>` : ""
-        }</div>`;
-      } else if (encerrado) {
-        faixaStatus = `<div class="faixa faixa-encerrado">⚫ ENCERRADO${
-          temPlacar ? ` — placar final: <b>${r.golsAoVivoMandante} x ${r.golsAoVivoVisitante}</b>` : ""
-        }</div>`;
-      }
+  let statusChip;
+  if (aoVivo) {
+    statusChip = `<span class="status status-vivo"><span class="dot dot-vivo"></span>${escapeHtml(r.statusTexto)}</span>`;
+  } else if (encerrado) {
+    statusChip = `<span class="status status-fim"><span class="dot dot-fim"></span>Encerrado</span>`;
+  } else {
+    statusChip = `<span class="status status-agenda"><span class="dot dot-agenda"></span>${escapeHtml(r.hora)}</span>`;
+  }
 
-      return `
-      <div class="jogo">
-        ${faixaStatus}
-        <div class="topo">
-          <span class="hora">🕒 ${escapeHtml(r.hora)}</span>
+  const placarHtml = temPlacar
+    ? `<div class="placar${aoVivo ? " placar-vivo" : ""}">${r.golsAoVivoMandante}<span class="sep">–</span>${r.golsAoVivoVisitante}</div>`
+    : `<div class="placar placar-vs">vs</div>`;
+
+  const pct = Math.max(6, Math.min(100, Math.round((r.combinado / 6) * 100)));
+  const chamas = "🔥".repeat(s.nivel);
+
+  return `
+      <article class="jogo${aoVivo ? " jogo-vivo" : ""}">
+        <div class="jogo-topo">
+          ${statusChip}
           <span class="campeonato">${escapeHtml(r.campeonato)}</span>
         </div>
         <div class="confronto">
           <div class="time">
-            <img class="escudo" src="${logoMandante}" alt="${escapeHtml(r.mandanteNome)}"
+            <img class="escudo" src="${logoMandante}" alt="${escapeHtml(r.mandanteNome)}" loading="lazy"
                  onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
             <div class="escudo-fallback" style="display:none;">⚽</div>
             <div class="time-nome">${escapeHtml(r.mandanteNome)}</div>
-            <div class="media">Média: <b>${r.mediaMandante.toFixed(2)}</b> gols</div>
+            <div class="media">${r.mediaMandante.toFixed(2)} gols/jogo</div>
           </div>
-          <div class="x">✕</div>
+          ${placarHtml}
           <div class="time">
-            <img class="escudo" src="${logoVisitante}" alt="${escapeHtml(r.visitanteNome)}"
+            <img class="escudo" src="${logoVisitante}" alt="${escapeHtml(r.visitanteNome)}" loading="lazy"
                  onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
             <div class="escudo-fallback" style="display:none;">⚽</div>
             <div class="time-nome">${escapeHtml(r.visitanteNome)}</div>
-            <div class="media">Média: <b>${r.mediaVisitante.toFixed(2)}</b> gols</div>
+            <div class="media">${r.mediaVisitante.toFixed(2)} gols/jogo</div>
           </div>
         </div>
-        <div class="rodape">
-          <span class="combinado">⚽ Total esperado: <b>${r.combinado.toFixed(2)} gols</b></span>
-          <span class="selo" style="color:${s.cor}; background:${s.fundo}; border:2px solid ${s.cor};">
-            ${s.icone} ${s.texto}
-          </span>
+        <div class="medidor" role="img" aria-label="Expectativa de ${r.combinado.toFixed(2)} gols">
+          <div class="medidor-barra" style="width:${pct}%; background:${s.cor};"></div>
         </div>
-      </div>`;
-    })
-    .join("\n");
+        <div class="rodape">
+          <span class="expectativa">Expectativa <b>${r.combinado.toFixed(2)}</b> gols</span>
+          <span class="selo" style="color:${s.cor}; border-color:${s.cor};">${chamas} ${s.texto}</span>
+        </div>
+      </article>`;
+}
 
-  const listaOuVazio =
+function gerarHtml(resultados, data, minCombinado) {
+  const aoVivo = resultados.filter((r) => r.statusTipo === "inprogress");
+  const emBreve = resultados.filter((r) => r.statusTipo !== "inprogress" && r.statusTipo !== "finished");
+  const encerrados = resultados.filter((r) => r.statusTipo === "finished");
+
+  function secao(titulo, classeDot, lista) {
+    if (lista.length === 0) return "";
+    return `
+    <section class="secao">
+      <h2><span class="dot ${classeDot}"></span>${titulo}<span class="contador">${lista.length}</span></h2>
+      <div class="grid">
+        ${lista.map(cartaoJogo).join("\n")}
+      </div>
+    </section>`;
+  }
+
+  const conteudo =
     resultados.length > 0
-      ? linhas
-      : `<div class="vazio">😕 Nenhum jogo com chance forte de gol encontrado agora.<br>Isso é normal em dias com poucos jogos grandes. Tente mais tarde ou outra data.</div>`;
+      ? `${secao("Ao vivo agora", "dot-vivo", aoVivo)}${secao("A começar", "dot-agenda", emBreve)}${secao("Encerrados", "dot-fim", encerrados)}`
+      : `<div class="vazio">Nenhum jogo com chance forte de gol agora.<br>Isso é normal em dias com poucos jogos grandes — tente mais tarde ou outra data.</div>`;
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>Jogos com mais de 2,5 gols - ${escapeHtml(data)}</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gols Ao Vivo — ${escapeHtml(data)}</title>
 <style>
-  body { font-family: Arial, Helvetica, sans-serif; background:#f4f6f8; margin:0; padding:24px; color:#222; }
-  h1 { font-size:26px; margin-bottom:4px; }
-  .subtitulo { color:#555; margin-bottom:24px; font-size:15px; }
-  .lista { display:flex; flex-direction:column; gap:16px; max-width:720px; margin:0 auto; }
-  .jogo { background:#fff; border-radius:12px; padding:16px 20px; box-shadow:0 2px 6px rgba(0,0,0,0.08); }
-  .topo { display:flex; justify-content:space-between; font-size:14px; color:#666; margin-bottom:12px; }
-  .hora { font-weight:bold; }
-  .confronto { display:flex; align-items:center; justify-content:space-between; gap:12px; }
-  .time { flex:1; display:flex; flex-direction:column; align-items:center; text-align:center; gap:4px; }
-  .escudo { width:56px; height:56px; object-fit:contain; }
-  .escudo-fallback { width:56px; height:56px; font-size:32px; align-items:center; justify-content:center; }
-  .time-nome { font-weight:bold; font-size:15px; }
-  .media { font-size:13px; color:#555; }
-  .x { font-size:18px; color:#999; font-weight:bold; padding:0 6px; }
-  .rodape { display:flex; justify-content:space-between; align-items:center; margin-top:14px; padding-top:12px; border-top:1px solid #eee; flex-wrap:wrap; gap:8px; }
-  .combinado { font-size:15px; }
-  .selo { padding:6px 12px; border-radius:20px; font-weight:bold; font-size:14px; white-space:nowrap; }
-  .aviso { max-width:720px; margin:24px auto 0; background:#fff3cd; border:1px solid #ffe08a; color:#7a5c00; padding:12px 16px; border-radius:8px; font-size:14px; }
-  .faixa { text-align:center; font-weight:bold; font-size:13px; padding:6px 10px; border-radius:8px; margin-bottom:12px; }
-  .faixa-vivo { background:#fdecea; color:#c0392b; animation: pisca 1.4s infinite; }
-  .faixa-encerrado { background:#eee; color:#555; }
-  @keyframes pisca { 0%, 100% { opacity:1; } 50% { opacity:0.55; } }
-  .vazio { background:#fff; border-radius:12px; padding:32px 20px; text-align:center; color:#555; font-size:15px; box-shadow:0 2px 6px rgba(0,0,0,0.08); }
+  :root {
+    --bg: #0a1613;
+    --bg-glow: #123024;
+    --surface: #10201a;
+    --surface-2: #16281f;
+    --border: rgba(223,255,238,0.08);
+    --ink: #f2f7f2;
+    --ink-dim: #8fa89a;
+    --flood: #7fd4ff;
+    --flood-dim: rgba(127,212,255,0.16);
+    --live: #ff4d4d;
+    --font-display: "Archivo Narrow", "Roboto Condensed", "Arial Narrow", sans-serif;
+    --font-body: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: "SFMono-Regular", "Cascadia Code", Consolas, "Liberation Mono", monospace;
+  }
+  * { box-sizing: border-box; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001ms !important; } }
+
+  body {
+    font-family: var(--font-body);
+    background: radial-gradient(ellipse 900px 500px at 20% -10%, var(--bg-glow), transparent 60%), var(--bg);
+    background-attachment: fixed;
+    margin: 0; padding: 0 16px 48px; color: var(--ink);
+  }
+
+  header { max-width: 1180px; margin: 0 auto; padding: 40px 4px 24px; border-bottom: 1px solid var(--border); }
+  .marca { display: flex; align-items: baseline; gap: 14px; }
+  .marca .bola { font-size: 26px; line-height: 1; }
+  h1 {
+    font-family: var(--font-display); font-weight: 800; text-transform: uppercase;
+    font-size: clamp(28px, 4vw, 40px); letter-spacing: .01em; margin: 0; color: var(--ink);
+    text-wrap: balance;
+  }
+  .ticker {
+    display: flex; align-items: center; gap: 8px; margin-top: 10px;
+    font-family: var(--font-mono); font-size: 12.5px; color: var(--ink-dim); letter-spacing: .02em;
+  }
+
+  .secao { max-width: 1180px; margin: 0 auto; padding: 0 4px; }
+  .secao h2 {
+    font-family: var(--font-display); font-weight: 700; text-transform: uppercase;
+    font-size: 15px; letter-spacing: .1em; color: var(--ink);
+    display: flex; align-items: center; gap: 9px; margin: 32px 0 16px;
+  }
+  .contador {
+    font-family: var(--font-mono); background: var(--surface-2); color: var(--ink-dim);
+    font-size: 11.5px; padding: 2px 8px; border-radius: 4px; font-weight: 600;
+  }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+
+  .jogo {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px 18px 14px; transition: transform .15s ease, border-color .15s ease;
+  }
+  .jogo:hover { transform: translateY(-2px); border-color: rgba(127,212,255,.3); }
+  .jogo-vivo { border-color: rgba(255,77,77,.35); box-shadow: 0 0 0 1px rgba(255,77,77,.12); }
+
+  .jogo-topo { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; gap: 8px; flex-wrap: wrap; }
+  .campeonato {
+    font-family: var(--font-mono); font-size: 11px; color: var(--ink-dim); text-transform: uppercase;
+    letter-spacing: .04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 55%;
+  }
+
+  .status { font-family: var(--font-mono); font-size: 11.5px; font-weight: 600; letter-spacing: .03em; display: inline-flex; align-items: center; color: var(--ink-dim); }
+  .status-vivo { color: #ff8080; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; margin-right: 7px; flex-shrink: 0; }
+  .dot-vivo { background: var(--live); box-shadow: 0 0 7px var(--live); animation: pisca 1.3s infinite; }
+  .dot-agenda { background: var(--flood); box-shadow: 0 0 6px var(--flood); }
+  .dot-fim { background: var(--ink-dim); }
+  @keyframes pisca { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+
+  .confronto { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+  .time { flex: 1; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; min-width: 0; }
+  .escudo { width: 48px; height: 48px; object-fit: contain; filter: drop-shadow(0 2px 5px rgba(0,0,0,.5)); }
+  .escudo-fallback { width: 48px; height: 48px; font-size: 28px; align-items: center; justify-content: center; }
+  .time-nome {
+    font-weight: 600; font-size: 13px; line-height: 1.25; overflow: hidden; text-overflow: ellipsis;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  }
+  .media { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+
+  .placar { min-width: 58px; text-align: center; font-family: var(--font-mono); font-weight: 700; font-size: 20px; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .placar-vs { font-size: 12px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-dim); }
+  .placar-vivo { color: #ff8080; text-shadow: 0 0 12px rgba(255,77,77,.35); }
+  .placar .sep { color: var(--ink-dim); margin: 0 3px; font-weight: 400; }
+
+  .medidor { height: 4px; border-radius: 3px; background: var(--surface-2); margin: 16px 0 12px; overflow: hidden; }
+  .medidor-barra { height: 100%; }
+
+  .rodape { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .expectativa { font-family: var(--font-mono); font-size: 12px; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+  .expectativa b { color: var(--ink); }
+  .selo {
+    font-size: 12px; font-weight: 700; white-space: nowrap; padding: 4px 10px 4px 8px; background: var(--surface-2);
+    border: 1px solid; clip-path: polygon(6px 0, 100% 0, 100% 100%, 0 100%, 0 6px);
+  }
+
+  .vazio {
+    max-width: 620px; margin: 64px auto; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 40px 24px; text-align: center; color: var(--ink-dim); font-size: 15px;
+  }
+
+  .aviso { max-width: 1180px; margin: 40px auto 0; padding: 0 4px; }
+  .aviso-caixa {
+    background: rgba(255,209,102,0.07); border: 1px solid rgba(255,209,102,.22); color: #ffd166;
+    padding: 12px 16px; border-radius: 8px; font-size: 12.5px; font-family: var(--font-mono);
+  }
+
+  footer { max-width: 1180px; margin: 20px auto 0; padding: 0 4px; color: var(--ink-dim); font-size: 11px; font-family: var(--font-mono); text-align: center; }
 </style>
 </head>
 <body>
-  <h1>⚽ Jogos com chance de mais de 2,5 gols</h1>
-  <div class="subtitulo">Data: ${escapeHtml(data)} • Mínimo analisado: ${minCombinado} gols combinados • ${resultados.length} jogo(s) encontrado(s)</div>
-  <div class="lista">
-    ${listaOuVazio}
-  </div>
+  <header>
+    <div class="marca"><span class="bola">⚽</span><h1>Gols Ao Vivo</h1></div>
+    <div class="ticker"><span class="dot dot-vivo"></span>ATUALIZADO AUTOMATICAMENTE · ${escapeHtml(data)} · ${resultados.length} JOGO(S) ≥ ${minCombinado} GOLS COMBINADOS</div>
+  </header>
+
+  ${conteudo}
+
   <div class="aviso">
-    ⚠️ Isso é estatística baseada nos últimos jogos de cada time. Não é garantia de resultado. Aposte com responsabilidade.
+    <div class="aviso-caixa">Estatística baseada nos últimos jogos de cada time. Não é garantia de resultado. Aposte com responsabilidade.</div>
   </div>
+  <footer>DADOS VIA SOFASCORE · PÁGINA GERADA AUTOMATICAMENTE</footer>
 </body>
 </html>`;
 }
